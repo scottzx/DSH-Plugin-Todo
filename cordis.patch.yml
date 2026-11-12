@@ -1,0 +1,3 @@
+- insert:
+    - id: ios-agenda
+      name: '@1agents/dsh-plugin-todo'

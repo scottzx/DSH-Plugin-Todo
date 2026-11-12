@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>CFBundleIdentifier</key>
+  <string>work.1agents.ios-agenda</string>
+  <key>CFBundleName</key>
+  <string>ios-agenda</string>
+  <key>CFBundleDisplayName</key>
+  <string>IosAgenda</string>
+  <key>CFBundleExecutable</key>
+  <string>ios-agenda</string>
+  <key>CFBundlePackageType</key>
+  <string>APPL</string>
+  <key>CFBundleVersion</key>
+  <string>0.1.0</string>
+  <key>CFBundleShortVersionString</key>
+  <string>0.1.0</string>
+  <key>LSUIElement</key>
+  <true/>
+  <key>NSCalendarsUsageDescription</key>
+  <string>读取和修改这台 Mac 上已同步的系统日历。</string>
+  <key>NSRemindersUsageDescription</key>
+  <string>读取和修改这台 Mac 上已同步的系统提醒事项。</string>
+  <key>NSCalendarsFullAccessUsageDescription</key>
+  <string>读取和修改这台 Mac 上已同步的系统日历。</string>
+  <key>NSRemindersFullAccessUsageDescription</key>
+  <string>读取和修改这台 Mac 上已同步的系统提醒事项。</string>
+</dict>
+</plist>
