@@ -17,6 +17,14 @@ const zh = {
     complete: '完成',
     remove: '删除',
     permission: '需要在系统设置里允许 IosAgenda.app（work.1agents.ios-agenda）访问提醒事项和日历。',
+    authorize: '授权',
+    openSettings: '打开系统设置',
+    authTitle: '需要访问提醒事项和日历',
+    authBody: '点授权后会弹出系统请求。如果之前拒绝过，会打开系统设置里的对应开关。',
+    authGranted: '已允许',
+    authNeeded: '未允许',
+    authSettings: '系统设置已打开。打开开关后点刷新。',
+    reminders: '提醒事项',
     allDay: '全天',
     continues: '续',
     overdue: '逾期',
@@ -44,6 +52,14 @@ const en = {
     complete: 'Complete',
     remove: 'Delete',
     permission: 'Allow IosAgenda.app (work.1agents.ios-agenda) to access Reminders and Calendar in System Settings.',
+    authorize: 'Allow access',
+    openSettings: 'Open System Settings',
+    authTitle: 'Reminders and Calendar access',
+    authBody: 'Allow access to show the system prompt. If access was denied, this opens the matching switch in System Settings.',
+    authGranted: 'Allowed',
+    authNeeded: 'Not allowed',
+    authSettings: 'System Settings is open. Turn the switch on, then refresh.',
+    reminders: 'Reminders',
     allDay: 'All day',
     continues: 'Continues',
     overdue: 'Overdue',
@@ -83,6 +99,14 @@ function readViewPreference() {
     } catch {
         return empty;
     }
+}
+
+function accessGranted(status) {
+    return status === 'fullAccess' || status === 'authorized';
+}
+
+function accessBlocked(status) {
+    return status === 'denied' || status === 'restricted' || status === 'writeOnly';
 }
 
 function soleAccent(colors) {
@@ -455,6 +479,7 @@ function AgendaPage({ t, agenda }) {
     const [data, setData] = useState(null);
     const [loadedKey, setLoadedKey] = useState('');
     const [error, setError] = useState('');
+    const [auth, setAuth] = useState(null);
     const [busy, setBusy] = useState(false);
     const [revision, setRevision] = useState(0);
     const [hiddenLists, setHiddenLists] = useState(() => new Set(viewPreference.hiddenLists));
@@ -478,9 +503,20 @@ function AgendaPage({ t, agenda }) {
             if (!active || requestId !== requestRef.current) return;
             setBusy(false);
             if (!result.ok) {
-                setError(result.error?.code === 'ACCESS_DENIED' ? t('permission') : result.error?.message || t('unavailable'));
+                if (result.error?.code === 'ACCESS_DENIED') {
+                    setAuth({
+                        reminders: result.error.access?.reminders || 'notDetermined',
+                        events: result.error.access?.events || 'notDetermined',
+                        openedSettings: false,
+                    });
+                    setError('');
+                    return;
+                }
+                setAuth(null);
+                setError(result.error?.message || t('unavailable'));
                 return;
             }
+            setAuth(null);
             setError('');
             setData(result.data);
             setLoadedKey(range.key);
@@ -502,6 +538,27 @@ function AgendaPage({ t, agenda }) {
             // 写不进本地偏好时，当前这次选择仍然生效。
         }
     }, [mode, hiddenLists, hiddenCalendars]);
+
+    async function authorize() {
+        setBusy(true);
+        const result = await invoke(agenda, 'authorize', {});
+        setBusy(false);
+        if (!result.ok) {
+            setError(result.error?.message || t('unavailable'));
+            return;
+        }
+        const report = result.data?.access ?? {};
+        if (result.data?.granted) {
+            setAuth(null);
+            setRevision((value) => value + 1);
+            return;
+        }
+        setAuth({
+            reminders: report.reminders || 'notDetermined',
+            events: report.events || 'notDetermined',
+            openedSettings: Boolean(result.data?.openedSettings),
+        });
+    }
 
     function selectDay(date) {
         const day = startOfDay(date);
@@ -665,14 +722,24 @@ function AgendaPage({ t, agenda }) {
                         </div>
                         <button type="button" className="ia-refresh" onClick={() => setRevision((value) => value + 1)} disabled={busy}>{t('refresh')}</button>
                     </header>
+                    {auth && <section className="ia-auth">
+                        <h2>{t('authTitle')}</h2>
+                        <p>{t('authBody')}</p>
+                        <div className="ia-auth-row"><span>{t('reminders')}</span><strong>{accessGranted(auth.reminders) ? t('authGranted') : t('authNeeded')}</strong></div>
+                        <div className="ia-auth-row"><span>{t('calendars')}</span><strong>{accessGranted(auth.events) ? t('authGranted') : t('authNeeded')}</strong></div>
+                        {auth.openedSettings && <p className="ia-auth-hint">{t('authSettings')}</p>}
+                        <button type="button" onClick={authorize} disabled={busy}>
+                            {accessBlocked(auth.reminders) || accessBlocked(auth.events) ? t('openSettings') : t('authorize')}
+                        </button>
+                    </section>}
                     {error && <p className="ios-agenda-error" role="alert">{error}</p>}
-                    {!ready && !error && <p className="ios-agenda-muted">{t('loading')}</p>}
-                    {ready && mode === 'day' && <section className="ia-day-list">
+                    {!ready && !error && !auth && <p className="ios-agenda-muted">{t('loading')}</p>}
+                    {ready && !auth && mode === 'day' && <section className="ia-day-list">
                         {dayList.length
                             ? <AgendaBlocks blocks={dayList} overdueIds={overdueIds} listColors={listColors} calendarColors={calendarColors} t={t} busy={busy} onComplete={(id) => submit('completeReminder', { id, completed: true }, () => {})} onDelete={(method, id) => submit(method, { id }, () => {})} />
                             : <p className="ios-agenda-muted">{t('emptyDay')}</p>}
                     </section>}
-                    {ready && mode === 'week' && <div className="ia-week-scroll">
+                    {ready && !auth && mode === 'week' && <div className="ia-week-scroll">
                         <div className="ia-week">
                             {weekDays.map((day) => {
                                 const blocks = dayBlocks(day, events, reminders);
@@ -686,7 +753,7 @@ function AgendaPage({ t, agenda }) {
                             })}
                         </div>
                     </div>}
-                    {ready && overdueItems.length > 0 && <section className="ia-group" ref={overdueRef}>
+                    {ready && !auth && overdueItems.length > 0 && <section className="ia-group" ref={overdueRef}>
                         <h2>{t('overdue')}</h2>
                         {overdueItems.map((item) => <AgendaRow
                             key={`overdue:${item.id}`}
@@ -702,7 +769,7 @@ function AgendaPage({ t, agenda }) {
                             busy={busy}
                         />)}
                     </section>}
-                    {ready && undatedItems.length > 0 && <section className="ia-group" ref={undatedRef}>
+                    {ready && !auth && undatedItems.length > 0 && <section className="ia-group" ref={undatedRef}>
                         <h2>{t('undated')}</h2>
                         {undatedItems.map((item) => <AgendaRow
                             key={`undated:${item.id}`}
@@ -718,7 +785,7 @@ function AgendaPage({ t, agenda }) {
                         />)}
                     </section>}
                 </div>
-                <form className="ia-composer" onSubmit={(event) => {
+                {!auth && <form className="ia-composer" onSubmit={(event) => {
                     event.preventDefault();
                     if (!reminderTitle.trim()) return;
                     submit('createReminder', { title: reminderTitle.trim() }, () => setReminderTitle(''));
@@ -726,8 +793,8 @@ function AgendaPage({ t, agenda }) {
                     <input aria-label={t('titleField')} value={reminderTitle} placeholder={t('newReminder')} onChange={(event) => setReminderTitle(event.target.value)} />
                     <button type="submit" disabled={busy || !reminderTitle.trim()}>{t('add')}</button>
                     <button type="button" onClick={() => (eventOpen ? setEventOpen(false) : openEvent())}>{t('newEvent')}</button>
-                </form>
-                {eventOpen && <form className="ia-event-form" onSubmit={(event) => {
+                </form>}
+                {!auth && eventOpen && <form className="ia-event-form" onSubmit={(event) => {
                     event.preventDefault();
                     if (!eventTitle.trim() || !eventStart || !eventEnd) return;
                     submit('createEvent', {
@@ -827,6 +894,11 @@ const css = `
 .ia-composer { border-top: 1px solid var(--dsw-alias-border-default); }
 .ia-event-form { padding-top: 0; padding-bottom: 14px; }
 .ia-composer input, .ia-event-form input { flex: 1; min-width: 0; border: 1px solid var(--dsw-alias-border-default); background: var(--dsw-alias-bg-layer-1); border-radius: 8px; padding: 8px 10px; }
+.ia-auth { max-width: 440px; margin: 12px 0 20px; padding: 16px; border: 1px solid var(--dsw-alias-border-default); border-radius: 12px; background: var(--dsw-alias-bg-layer-1); }
+.ia-auth h2 { margin: 0 0 6px; font-size: 16px; font-weight: 600; }
+.ia-auth p, .ia-auth-hint { margin: 0 0 12px; color: var(--dsw-alias-label-secondary); }
+.ia-auth-row { display: flex; justify-content: space-between; gap: 12px; padding: 6px 0; }
+.ia-auth button { margin-top: 8px; border: none; border-radius: 8px; padding: 8px 14px; cursor: pointer; background: var(--dsw-alias-state-business-primary); color: var(--dsw-alias-bg-base); }
 .ios-agenda-error { margin: 0 0 12px; padding: 8px 10px; border-radius: 8px; background: var(--dsw-alias-bg-layer-1); }
 .ios-agenda input[type="checkbox"] { width: 16px; height: 16px; margin: 0; accent-color: var(--dsw-alias-state-business-primary); }
 .ia-filter-row input[type="checkbox"] { flex: none; accent-color: var(--ia-swatch, var(--dsw-alias-state-business-primary)); }

@@ -16,6 +16,23 @@ final class AgendaStore {
         ready = true
     }
 
+    func authorize(_ input: [String: Any]) async throws -> [String: Any] {
+        _ = input
+        NSApplication.shared.setActivationPolicy(.accessory)
+        NSApplication.shared.activate(ignoringOtherApps: true)
+        let reminders = try await authorizeEntity(.reminder)
+        let events = try await authorizeEntity(.event)
+        let granted = isReadable(reminders) && isReadable(events)
+        ready = granted
+        let pane = settingsPane(reminders: reminders, events: events)
+        if let pane { openPrivacySettings(pane) }
+        return [
+            "access": ["reminders": reminders, "events": events],
+            "granted": granted,
+            "openedSettings": pane != nil,
+        ]
+    }
+
     func snapshot(_ input: [String: Any]) async throws -> [String: Any] {
         try await ensureAccess()
         let limit = min(max(JSON.int(input, "limit") ?? 200, 1), 500)
@@ -112,19 +129,41 @@ final class AgendaStore {
     }
 
     private func request(_ entity: EKEntityType) async throws {
-        let status = EKEventStore.authorizationStatus(for: entity)
-        if status == .fullAccess { return }
-        if status == .denied || status == .restricted || status == .writeOnly {
-            throw AgendaError(code: "ACCESS_DENIED", message: deniedMessage(entity, status))
-        }
-        let granted: Bool
-        if entity == .reminder {
-            granted = try await store.requestFullAccessToReminders()
-        } else {
-            granted = try await store.requestFullAccessToEvents()
-        }
-        if !granted {
-            throw AgendaError(code: "ACCESS_DENIED", message: deniedMessage(entity, EKEventStore.authorizationStatus(for: entity)))
+        let status = try await authorizeEntity(entity)
+        if isReadable(status) { return }
+        throw AgendaError(code: "ACCESS_DENIED", message: deniedMessage(entity, EKEventStore.authorizationStatus(for: entity)), access: accessReport())
+    }
+
+    private func authorizeEntity(_ entity: EKEntityType) async throws -> String {
+        let current = EKEventStore.authorizationStatus(for: entity)
+        if isReadable(statusName(current)) { return statusName(current) }
+        if current == .denied || current == .restricted || current == .writeOnly { return statusName(current) }
+        let granted = entity == .reminder
+            ? try await store.requestFullAccessToReminders()
+            : try await store.requestFullAccessToEvents()
+        let next = EKEventStore.authorizationStatus(for: entity)
+        if granted || isReadable(statusName(next)) { return statusName(next) }
+        return statusName(next)
+    }
+
+    private func isReadable(_ status: String) -> Bool {
+        status == "fullAccess" || status == "authorized"
+    }
+
+    private func settingsPane(reminders: String, events: String) -> String? {
+        if !isReadable(reminders) && reminders != "notDetermined" { return "Privacy_Reminders" }
+        if !isReadable(events) && events != "notDetermined" { return "Privacy_Calendars" }
+        return nil
+    }
+
+    private func openPrivacySettings(_ pane: String) {
+        let urls = [
+            "x-apple.systempreferences:com.apple.settings.PrivacySecurity.extension?\(pane)",
+            "x-apple.systempreferences:com.apple.preference.security?\(pane)",
+        ]
+        for text in urls {
+            guard let url = URL(string: text) else { continue }
+            if NSWorkspace.shared.open(url) { return }
         }
     }
 
@@ -195,7 +234,11 @@ final class AgendaStore {
     }
 
     private func statusName(_ entity: EKEntityType) -> String {
-        switch EKEventStore.authorizationStatus(for: entity) {
+        statusName(EKEventStore.authorizationStatus(for: entity))
+    }
+
+    private func statusName(_ status: EKAuthorizationStatus) -> String {
+        switch status {
         case .notDetermined: return "notDetermined"
         case .restricted: return "restricted"
         case .denied: return "denied"

@@ -3,13 +3,14 @@ import Darwin
 import Foundation
 
 enum AgendaMethods {
-    static let names = ["snapshot", "createReminder", "completeReminder", "deleteReminder", "createEvent", "deleteEvent"]
+    static let names = ["authorize", "snapshot", "createReminder", "completeReminder", "deleteReminder", "createEvent", "deleteEvent"]
 
     @MainActor
     static func call(_ name: String, _ input: [String: Any], store: AgendaStore) async -> [String: Any] {
         do {
             let data: [String: Any]
             switch name {
+            case "authorize": data = try await store.authorize(input)
             case "snapshot": data = try await store.snapshot(input)
             case "createReminder": data = try await store.createReminder(input)
             case "completeReminder": data = try await store.completeReminder(input)
@@ -83,7 +84,7 @@ enum MCPServer {
                     "result": [
                         "protocolVersion": version,
                         "capabilities": ["tools": ["listChanged": false]],
-                        "serverInfo": ["name": "ios-agenda", "version": "0.1.0"],
+                        "serverInfo": ["name": "ios-agenda", "version": "0.1.1"],
                     ],
                 ])
             case "ping":
@@ -115,6 +116,7 @@ enum MCPServer {
 
     private static func mapTool(_ name: String) -> String {
         switch name {
+        case "authorize", "access": return "authorize"
         case "snapshot", "reminders", "events", "lists", "calendars": return "snapshot"
         case "create_reminder": return "createReminder"
         case "complete_reminder": return "completeReminder"
@@ -127,6 +129,10 @@ enum MCPServer {
 
     private static func tools() -> [[String: Any]] {
         return [
+            tool("agenda_authorize", "请求提醒事项和日历的完整访问。尚未决定时弹出系统授权框；已被拒绝时打开系统设置里对应的隐私页面。", [
+                "type": "object",
+                "properties": [:],
+            ]),
             tool("agenda_snapshot", "读取这台 Mac 上已同步的提醒事项和日历。默认返回未完成提醒，以及从今天起 7 天内的日程。", [
                 "type": "object",
                 "properties": [

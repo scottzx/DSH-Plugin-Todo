@@ -25,7 +25,7 @@ export async function callNative(binary, method, input = {}, signal) {
         const timer = setTimeout(() => {
             child.kill('SIGTERM');
             finish({ ok: false, error: { code: 'TIMEOUT', message: '读取日历或提醒事项超时。如果系统正在询问权限，允许后再试。' } });
-        }, 20000);
+        }, method === 'authorize' || method === 'snapshot' ? 120000 : 20000);
         child.stdout.setEncoding('utf8');
         child.stderr.setEncoding('utf8');
         child.stdout.on('data', (chunk) => { stdout += chunk; });

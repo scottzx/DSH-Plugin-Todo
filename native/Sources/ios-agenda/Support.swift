@@ -4,6 +4,7 @@ import Foundation
 struct AgendaError: Error, Sendable {
     var code: String
     var message: String
+    var access: [String: String]? = nil
 }
 
 enum JSON {
@@ -83,5 +84,7 @@ func envelope(ok data: [String: Any]) -> [String: Any] {
 }
 
 func envelope(error: AgendaError) -> [String: Any] {
-    ["ok": false, "error": ["code": error.code, "message": error.message]]
+    var body: [String: Any] = ["code": error.code, "message": error.message]
+    if let access = error.access { body["access"] = access }
+    return ["ok": false, "error": body]
 }

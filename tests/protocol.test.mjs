@@ -38,6 +38,7 @@ test('MCP 握手并列出工具，不读取日历', async () => {
         const listed = await nextMessage(child);
         const names = listed.result.tools.map((item) => item.name);
         assert.deepEqual(names, [
+            'agenda_authorize',
             'agenda_snapshot',
             'agenda_create_reminder',
             'agenda_complete_reminder',

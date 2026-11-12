@@ -15,6 +15,6 @@ dreammate-node cli inspect --agent http://127.0.0.1:36908 --service mcp-ios-agen
 dreammate-node cli invoke --agent http://127.0.0.1:36908 --service mcp-ios-agenda --method agenda_snapshot --params '{}'
 ```
 
-方法以 inspect 返回的 Schema 为准。常用的是 `agenda_snapshot`、`agenda_create_reminder`、`agenda_complete_reminder`、`agenda_create_event`。写入后不会立刻出现在手机上，要等 iCloud 同步。
+方法以 inspect 返回的 Schema 为准。常用的是 `agenda_snapshot`、`agenda_create_reminder`、`agenda_complete_reminder`、`agenda_create_event`。没有访问权限时先调用 `agenda_authorize`：还没决定会弹出系统授权框，已经被拒绝会打开系统设置。写入后不会立刻出现在手机上，要等 iCloud 同步。
 
 没有来源时，先在插件仓库执行 `npm run build`，再由 DSH 启用插件，或手动 `dreammate-node mcp add`。来源范围是 `local`。
