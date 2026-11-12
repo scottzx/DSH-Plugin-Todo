@@ -4,8 +4,12 @@
   "description": "管理本机已同步的系统提醒事项和日历。页面在 DSH，工具在 dreammate-node MCP。",
   "type": "module",
   "license": "MIT",
-  "os": ["darwin"],
-  "cpu": ["arm64"],
+  "os": [
+    "darwin"
+  ],
+  "cpu": [
+    "arm64"
+  ],
   "repository": {
     "type": "git",
     "url": "git+https://github.com/scottzx/DSH-Plugin-Todo.git"
@@ -19,7 +23,7 @@
     "registry": "https://registry.npmjs.org/"
   },
   "bin": {
-    "ios-agenda": "./bin/ios-agenda.mjs"
+    "ios-agenda": "bin/ios-agenda.mjs"
   },
   "exports": {
     ".": "./dist/host.js",
