@@ -84,7 +84,7 @@ enum MCPServer {
                     "result": [
                         "protocolVersion": version,
                         "capabilities": ["tools": ["listChanged": false]],
-                        "serverInfo": ["name": "ios-agenda", "version": "0.1.1"],
+                        "serverInfo": ["name": "ios-agenda", "version": "0.1.2"],
                     ],
                 ])
             case "ping":
@@ -96,8 +96,13 @@ enum MCPServer {
                 let arguments = params["arguments"] as? [String: Any] ?? [:]
                 let methodName = name.replacingOccurrences(of: "agenda_", with: "")
                 let mapped = mapTool(methodName)
-                if box.store == nil { box.store = AgendaStore() }
-                let result = await AgendaMethods.call(mapped, arguments, store: box.store!)
+                let result: [String: Any]
+                if let forwarded = LaunchCall.run(mapped, arguments) {
+                    result = forwarded
+                } else {
+                    if box.store == nil { box.store = AgendaStore() }
+                    result = await AgendaMethods.call(mapped, arguments, store: box.store!)
+                }
                 let text = String(data: (try? JSON.data(result)) ?? Data(), encoding: .utf8) ?? ""
                 var body: [String: Any] = [
                     "content": [["type": "text", "text": text]],

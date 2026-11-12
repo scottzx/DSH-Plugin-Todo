@@ -83,6 +83,55 @@ func envelope(ok data: [String: Any]) -> [String: Any] {
     ["ok": true, "data": data]
 }
 
+/// TCC 按「责任进程」判定授权。被宿主直接 spawn 的进程拿到的是宿主的归属，
+/// 日历权限会静默变成 notDetermined。交给 LaunchServices 重新起一个自己，
+/// 它才是自己的责任进程。MCP 这种长驻 stdio 进程只能这样转发。
+enum LaunchCall {
+    static func run(_ method: String, _ input: [String: Any]) -> [String: Any]? {
+        let bundle = Bundle.main.bundleURL
+        guard bundle.pathExtension == "app" else { return nil }
+        let manager = FileManager.default
+        let dir = manager.temporaryDirectory.appendingPathComponent("ios-agenda-\(UUID().uuidString)", isDirectory: true)
+        try? manager.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? manager.removeItem(at: dir) }
+        let inputPath = dir.appendingPathComponent("input.json")
+        let outputPath = dir.appendingPathComponent("output.json")
+        let errorPath = dir.appendingPathComponent("stderr.txt")
+        guard let data = try? JSON.data(input), (try? data.write(to: inputPath)) != nil else { return nil }
+
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/open")
+        process.arguments = [
+            "-W", "-n", "-a", bundle.path,
+            "--stdout", outputPath.path,
+            "--stderr", errorPath.path,
+            "--args", "call-file", method, inputPath.path,
+        ]
+        do {
+            try process.run()
+        } catch {
+            return nil
+        }
+        // 授权框等人点的时候别无限挂着。
+        let deadline = DispatchWorkItem {
+            guard process.isRunning else { return }
+            process.terminate()
+            let killer = Process()
+            killer.executableURL = URL(fileURLWithPath: "/usr/bin/pkill")
+            // 只收掉转发出来的那次调用，别误伤正在跑 MCP 的自己。
+            killer.arguments = ["-f", "\(bundle.appendingPathComponent("Contents/MacOS").path) call-file"]
+            try? killer.run()
+        }
+        DispatchQueue.global().asyncAfter(deadline: .now() + 150, execute: deadline)
+        process.waitUntilExit()
+        deadline.cancel()
+        guard let output = try? Data(contentsOf: outputPath) else { return nil }
+        let text = String(decoding: output, as: UTF8.self)
+        guard let line = text.split(separator: "\n").last(where: { !$0.trimmingCharacters(in: .whitespaces).isEmpty }) else { return nil }
+        return (try? JSONSerialization.jsonObject(with: Data(line.utf8))) as? [String: Any]
+    }
+}
+
 func envelope(error: AgendaError) -> [String: Any] {
     var body: [String: Any] = ["code": error.code, "message": error.message]
     if let access = error.access { body["access"] = access }

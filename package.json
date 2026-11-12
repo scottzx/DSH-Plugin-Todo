@@ -1,6 +1,6 @@
 {
   "name": "@1agents/dsh-plugin-todo",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "管理本机已同步的系统提醒事项和日历。页面在 DSH，工具在 dreammate-node MCP。",
   "type": "module",
   "license": "MIT",
