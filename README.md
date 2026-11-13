@@ -32,10 +32,17 @@ macOS 的隐私授权按「责任进程」判定，而不是看实际读数据�
 前提：Apple 芯片的 macOS、Node.js 20 或以上、已安装的 DeepSeek Harness。提醒事项和日历只在这台 Mac 上读写。当前发布的原生程序是 arm64，Intel Mac 不能安装。
 
 ```sh
-dsh plugin --profile web add @1agents/dsh-plugin-todo@0.1.3
+dsh plugin --profile web add @1agents/dsh-plugin-todo@0.1.4
 ```
 
 装完后重启 DSH。左侧栏「历史会话」上方出现「日程」。Host 启动时会把 MCP 登记到 `127.0.0.1:36908`。网关没在跑时，页面仍可用，Agent 搜索不到工具。当前这个对话窗口走的是 desktop profile；要在 `dsh web`（默认 `http://127.0.0.1:3080`）里看到，安装目标是 web profile。
+
+### 技能会自动装好
+
+安装时会把使用说明写到 `~/.dsh/skills/ios-agenda/SKILL.md`，DSH 会自动加载，Agent 之后处理日程和待办时会自己读到它。
+
+- 走 `postinstall`；如果 pnpm 忽略了依赖的 install 脚本（默认会忽略），插件启动时会再补写一次，两条路都幂等。
+- 想手动来一次：`node node_modules/@1agents/dsh-plugin-todo/scripts/install-skill.mjs`。
 
 从源码安装时，先完成本地构建，再把仓库目录加进 profile：
 

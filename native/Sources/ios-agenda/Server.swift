@@ -86,7 +86,7 @@ enum MCPServer {
                     "result": [
                         "protocolVersion": version,
                         "capabilities": ["tools": ["listChanged": false]],
-                        "serverInfo": ["name": "ios-agenda", "version": "0.1.3"],
+                        "serverInfo": ["name": "ios-agenda", "version": "0.1.4"],
                     ],
                 ])
             case "ping":
