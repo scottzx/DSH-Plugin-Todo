@@ -29,6 +29,12 @@ enum JSON {
         object[key] as? Bool
     }
 
+    /// 保留空字符串。更新时用它区分「没传这个字段」和「要清空」。
+    static func text(_ object: [String: Any], _ key: String) -> String? {
+        guard let value = object[key], !(value is NSNull) else { return nil }
+        return value as? String
+    }
+
     static func int(_ object: [String: Any], _ key: String) -> Int? {
         if let value = object[key] as? Int { return value }
         if let value = object[key] as? Double { return Int(value) }

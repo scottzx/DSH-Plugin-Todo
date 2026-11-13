@@ -2,7 +2,7 @@
 export const SERVICE = 'iosAgenda';
 export const PACKAGE = '@1agents/dsh-plugin-todo';
 export const PANEL_ID = 'ios-agenda';
-export const METHODS = ['authorize', 'snapshot', 'createReminder', 'completeReminder', 'deleteReminder', 'createEvent', 'deleteEvent'];
+export const METHODS = ['authorize', 'snapshot', 'createReminder', 'updateReminder', 'completeReminder', 'deleteReminder', 'createEvent', 'updateEvent', 'deleteEvent'];
 
 function objectOf(value) {
     if (!value || typeof value !== 'object' || Array.isArray(value)) return {};

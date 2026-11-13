@@ -32,7 +32,7 @@ macOS 的隐私授权按「责任进程」判定，而不是看实际读数据�
 前提：Apple 芯片的 macOS、Node.js 20 或以上、已安装的 DeepSeek Harness。提醒事项和日历只在这台 Mac 上读写。当前发布的原生程序是 arm64，Intel Mac 不能安装。
 
 ```sh
-dsh plugin --profile web add @1agents/dsh-plugin-todo@0.1.2
+dsh plugin --profile web add @1agents/dsh-plugin-todo@0.1.3
 ```
 
 装完后重启 DSH。左侧栏「历史会话」上方出现「日程」。Host 启动时会把 MCP 登记到 `127.0.0.1:36908`。网关没在跑时，页面仍可用，Agent 搜索不到工具。当前这个对话窗口走的是 desktop profile；要在 `dsh web`（默认 `http://127.0.0.1:3080`）里看到，安装目标是 web profile。

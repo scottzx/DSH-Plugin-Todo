@@ -41,9 +41,11 @@ test('MCP 握手并列出工具，不读取日历', async () => {
             'agenda_authorize',
             'agenda_snapshot',
             'agenda_create_reminder',
+            'agenda_update_reminder',
             'agenda_complete_reminder',
             'agenda_delete_reminder',
             'agenda_create_event',
+            'agenda_update_event',
             'agenda_delete_event',
         ]);
     } finally {

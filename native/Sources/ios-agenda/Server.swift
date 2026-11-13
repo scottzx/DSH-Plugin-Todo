@@ -3,7 +3,7 @@ import Darwin
 import Foundation
 
 enum AgendaMethods {
-    static let names = ["authorize", "snapshot", "createReminder", "completeReminder", "deleteReminder", "createEvent", "deleteEvent"]
+    static let names = ["authorize", "snapshot", "createReminder", "updateReminder", "completeReminder", "deleteReminder", "createEvent", "updateEvent", "deleteEvent"]
 
     @MainActor
     static func call(_ name: String, _ input: [String: Any], store: AgendaStore) async -> [String: Any] {
@@ -13,9 +13,11 @@ enum AgendaMethods {
             case "authorize": data = try await store.authorize(input)
             case "snapshot": data = try await store.snapshot(input)
             case "createReminder": data = try await store.createReminder(input)
+            case "updateReminder": data = try await store.updateReminder(input)
             case "completeReminder": data = try await store.completeReminder(input)
             case "deleteReminder": data = try await store.deleteReminder(input)
             case "createEvent": data = try await store.createEvent(input)
+            case "updateEvent": data = try await store.updateEvent(input)
             case "deleteEvent": data = try await store.deleteEvent(input)
             default:
                 throw AgendaError(code: "UNKNOWN_METHOD", message: "未知方法 \(name)")
@@ -84,7 +86,7 @@ enum MCPServer {
                     "result": [
                         "protocolVersion": version,
                         "capabilities": ["tools": ["listChanged": false]],
-                        "serverInfo": ["name": "ios-agenda", "version": "0.1.2"],
+                        "serverInfo": ["name": "ios-agenda", "version": "0.1.3"],
                     ],
                 ])
             case "ping":
@@ -124,9 +126,11 @@ enum MCPServer {
         case "authorize", "access": return "authorize"
         case "snapshot", "reminders", "events", "lists", "calendars": return "snapshot"
         case "create_reminder": return "createReminder"
+        case "update_reminder": return "updateReminder"
         case "complete_reminder": return "completeReminder"
         case "delete_reminder": return "deleteReminder"
         case "create_event": return "createEvent"
+        case "update_event": return "updateEvent"
         case "delete_event": return "deleteEvent"
         default: return name
         }
@@ -160,6 +164,19 @@ enum MCPServer {
                 ],
                 "required": ["title"],
             ]),
+            tool("agenda_update_reminder", "修改一条提醒事项。只改传入的字段；notes 传空字符串可清空，due 传空字符串可去掉截止时间。", [
+                "type": "object",
+                "properties": [
+                    "id": ["type": "string"],
+                    "title": ["type": "string"],
+                    "notes": ["type": "string"],
+                    "due": ["type": "string", "description": "ISO 8601 或 YYYY-MM-DD；空字符串表示清除截止时间"],
+                    "priority": ["type": "string", "enum": ["none", "low", "medium", "high"]],
+                    "list": ["type": "string", "description": "提醒列表名称或 id，用于换列表"],
+                    "completed": ["type": "boolean"],
+                ],
+                "required": ["id"],
+            ]),
             tool("agenda_complete_reminder", "把一条提醒事项标为完成或未完成。", [
                 "type": "object",
                 "properties": [
@@ -184,6 +201,20 @@ enum MCPServer {
                     "location": ["type": "string"],
                 ],
                 "required": ["title", "start", "end"],
+            ]),
+            tool("agenda_update_event", "修改一条日程。只改传入的字段；只传 start 时保持原本时长，notes/location 传空字符串可清空。", [
+                "type": "object",
+                "properties": [
+                    "id": ["type": "string"],
+                    "title": ["type": "string"],
+                    "start": ["type": "string", "description": "ISO 8601；只给日期按全天"],
+                    "end": ["type": "string", "description": "ISO 8601；只给日期按全天"],
+                    "calendar": ["type": "string", "description": "日历名称或 id，用于换日历"],
+                    "notes": ["type": "string"],
+                    "location": ["type": "string"],
+                    "span": ["type": "string", "enum": ["thisEvent", "futureEvents"], "description": "重复日程的修改范围：thisEvent 只改这一次，futureEvents 改这次及以后。默认 thisEvent"],
+                ],
+                "required": ["id"],
             ]),
             tool("agenda_delete_event", "删除一条日程。", [
                 "type": "object",

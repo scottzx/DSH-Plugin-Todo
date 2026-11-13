@@ -76,6 +76,32 @@ final class AgendaStore {
         return ["reminder": reminderJSON(reminder)]
     }
 
+    func updateReminder(_ input: [String: Any]) async throws -> [String: Any] {
+        try await ensureAccess()
+        let reminder = try reminder(JSON.string(input, "id"))
+        if let title = JSON.string(input, "title") { reminder.title = title }
+        if let notes = JSON.text(input, "notes") {
+            reminder.notes = notes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : notes
+        }
+        if let list = JSON.string(input, "list") { reminder.calendar = try reminderCalendar(list) }
+        if let due = JSON.text(input, "due") {
+            let trimmed = due.trimmingCharacters(in: .whitespacesAndNewlines)
+            if trimmed.isEmpty {
+                reminder.dueDateComponents = nil
+            } else if let date = Dates.parse(trimmed) {
+                reminder.dueDateComponents = Calendar.current.dateComponents([.year, .month, .day, .hour, .minute], from: date)
+            } else {
+                throw AgendaError(code: "BAD_INPUT", message: "due 需要 ISO 8601 或 YYYY-MM-DD")
+            }
+        }
+        if let priority = JSON.string(input, "priority") ?? JSON.int(input, "priority").map(String.init) {
+            reminder.priority = priorityValue(priority)
+        }
+        if let completed = JSON.bool(input, "completed") { reminder.isCompleted = completed }
+        try store.save(reminder, commit: true)
+        return ["reminder": reminderJSON(reminder)]
+    }
+
     func completeReminder(_ input: [String: Any]) async throws -> [String: Any] {
         try await ensureAccess()
         let reminder = try reminder(JSON.string(input, "id"))
@@ -126,6 +152,62 @@ final class AgendaStore {
         let id = event.eventIdentifier ?? event.calendarItemIdentifier
         try store.remove(event, span: .thisEvent, commit: true)
         return ["id": id, "deleted": true]
+    }
+
+    func updateEvent(_ input: [String: Any]) async throws -> [String: Any] {
+        try await ensureAccess()
+        let event = try event(JSON.string(input, "id"))
+        if let title = JSON.string(input, "title") { event.title = title }
+        if let notes = JSON.text(input, "notes") {
+            event.notes = notes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : notes
+        }
+        if let location = JSON.text(input, "location") {
+            event.location = location.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : location
+        }
+        if let calendar = JSON.string(input, "calendar") { event.calendar = try eventCalendar(calendar) }
+
+        let startText = JSON.text(input, "start")?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let endText = JSON.text(input, "end")?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        if !startText.isEmpty || !endText.isEmpty {
+            let currentStart = event.startDate ?? Date()
+            let currentEnd = event.endDate ?? currentStart
+            var start = currentStart
+            var end = currentEnd
+            if !startText.isEmpty {
+                guard let parsed = Dates.parse(startText) else {
+                    throw AgendaError(code: "BAD_INPUT", message: "start 需要 ISO 8601 或 YYYY-MM-DD")
+                }
+                start = parsed
+                // 只改开始时间时保持原本的时长。
+                if endText.isEmpty { end = start.addingTimeInterval(max(currentEnd.timeIntervalSince(currentStart), 0)) }
+            }
+            if !endText.isEmpty {
+                guard let parsed = Dates.parse(endText) else {
+                    throw AgendaError(code: "BAD_INPUT", message: "end 需要 ISO 8601 或 YYYY-MM-DD")
+                }
+                end = parsed
+            }
+            let dateOnly = !startText.isEmpty && !endText.isEmpty && Dates.isDateOnly(startText) && Dates.isDateOnly(endText)
+            if dateOnly {
+                event.isAllDay = true
+                if end <= start { end = Calendar.current.date(byAdding: .day, value: 1, to: start) ?? start.addingTimeInterval(86400) }
+            } else if !startText.isEmpty && !endText.isEmpty {
+                event.isAllDay = false
+            }
+            guard end > start else { throw AgendaError(code: "BAD_INPUT", message: "结束时间必须晚于开始时间") }
+            event.startDate = start
+            event.endDate = end
+        }
+
+        try store.save(event, span: spanValue(JSON.string(input, "span")), commit: true)
+        return ["event": eventJSON(event)]
+    }
+
+    private func spanValue(_ text: String?) -> EKSpan {
+        switch text?.lowercased() {
+        case "futureevents", "future", "allevents", "all": return .futureEvents
+        default: return .thisEvent
+        }
     }
 
     private func request(_ entity: EKEntityType) async throws {
